@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>アナモルフォーシス</title>
+    <link rel="stylesheet" href="./css/style.css">
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "./js/libs/three.module.js",
+            "three/addons/": "./js/libs/"
+        }
+    }
+    </script>
+</head>
+<body>
+
+    <!-- Three.jsが描画を行うキャンバス要素 -->
+    <canvas id="webgl-canvas"></canvas>
+
+    <!-- 操作用のUIパネル -->
+    <div id="ui-panel">
+        <header>
+            <h1>アナモルフォーシス・ジェネレーター</h1>
+            <p>アナモルフォーシスっていうらしいすよ。</p>
+        </header>
+
+        <!-- 1. 用紙設定セクション -->
+        <section class="ui-section">
+            <h2>1. 用紙設定 (cm)</h2>
+            <div class="input-group">
+                <label for="paper-width">用紙の幅:</label>
+                <input type="number" id="paper-width" value="40" min="1">
+            </div>
+            <div class="input-group">
+                <label for="paper-height">用紙の高さ:</label>
+                <input type="number" id="paper-height" value="30" min="1">
+            </div>
+        </section>
+
+        <!-- 2. 画像読み込みセクション -->
+        <section class="ui-section">
+            <h2>2. 画像の読み込み</h2>
+            <input type="file" id="image-loader" accept="image/png, image/jpeg">
+            <div id="image-preview-container">
+                <p>プレビュー:</p>
+                <img id="image-preview" src="" alt="読み込まれた画像のプレビュー" style="display: none; max-width: 100%; margin-top: 10px;">
+            </div>
+        </section>
+
+        <!-- 3. 投影調整セクション -->
+        <section class="ui-section">
+            <h2>3. 投影の調整</h2>
+            <div class="input-group">
+                <label for="transform-target">操作対象:</label>
+                <select id="transform-target">
+                    <option value="projection" selected>投影の調整</option>
+                    <option value="paper">紙の回転</option>
+                </select>
+            </div>
+            
+            <div id="projection-controls">
+                <!-- 位置調整 -->
+                <fieldset>
+                    <legend>位置 (cm)</legend>
+                    <div class="slider-group">
+                        <label>X:</label> <input type="range" id="proj-pos-x" min="-100" max="100" value="0" step="0.1"> <input type="number" id="proj-pos-x-num" value="0" step="0.1">
+                    </div>
+                    <div class="slider-group">
+                        <label>Y:</label> <input type="range" id="proj-pos-y" min="0" max="100" value="30" step="0.1"> <input type="number" id="proj-pos-y-num" value="30" step="0.1">
+                    </div>
+                    <div class="slider-group">
+                        <label>Z:</label> <input type="range" id="proj-pos-z" min="-100" max="100" value="0" step="0.1"> <input type="number" id="proj-pos-z-num" value="0" step="0.1">
+                    </div>
+                </fieldset>
+                
+                <!-- 回転調整 -->
+                <fieldset>
+                    <legend>回転 (°)</legend>
+                    <div class="slider-group">
+                        <label>X:</label> <input type="range" id="proj-rot-x" min="-180" max="180" value="-45" step="1"> <input type="number" id="proj-rot-x-num" value="-45" step="1">
+                    </div>
+                    <div class="slider-group">
+                        <label>Y:</label> <input type="range" id="proj-rot-y" min="-180" max="180" value="0" step="1"> <input type="number" id="proj-rot-y-num" value="0" step="1">
+                    </div>
+                    <div class="slider-group">
+                        <label>Z:</label> <input type="range" id="proj-rot-z" min="-180" max="180" value="0" step="1"> <input type="number" id="proj-rot-z-num" value="0" step="1">
+                    </div>
+                </fieldset>
+                
+                <!-- スケール調整 -->
+                <fieldset>
+                    <legend>スケール</legend>
+                    <div class="slider-group">
+                        <label>X:</label> <input type="range" id="proj-scale-x" min="0.1" max="5" value="1" step="0.01"> <input type="number" id="proj-scale-x-num" value="1" step="0.01">
+                    </div>
+                    <div class="slider-group">
+                        <label>Y:</label> <input type="range" id="proj-scale-y" min="0.1" max="5" value="1" step="0.01"> <input type="number" id="proj-scale-y-num" value="1" step="0.01">
+                    </div>
+                    <div class="slider-group">
+                        <label>Z:</label> <input type="range" id="proj-scale-z" min="0.1" max="5" value="1" step="0.01"> <input type="number" id="proj-scale-z-num" value="1" step="0.01">
+                    </div>
+                </fieldset>
+            </div>
+        </section>
+
+        <!-- 4. エクスポートセクション -->
+        <section class="ui-section">
+            <h2>4. 展開図のエクスポート</h2>
+            <div class="input-group">
+                <label for="export-dpi">解像度 (DPI):</label>
+                <select id="export-dpi">
+                    <option value="72">72 DPI (スクリーン用)</option>
+                    <option value="150" selected>150 DPI (標準印刷)</option>
+                    <option value="300">300 DPI (高精細印刷)</option>
+                </select>
+            </div>
+            <button id="export-button">展開図をエクスポート (PNG)</button>
+        </section>
+
+    </div>
+
+    <!-- 操作ガイドのオーバーレイ -->
+    <div id="help-overlay">
+        <div class="help-content">
+            <h2>操作ガイド</h2>
+            <ul>
+                <li><strong>視点操作:</strong> マウスドラッグで回転、右ドラッグで平行移動、ホイールでズーム。</li>
+                <li><strong>ギズモ操作:</strong> 3Dビューの矢印/円/四角をドラッグして投影を調整します。</li>
+                <li><strong>[G] キー:</strong> 移動モードに切り替え</li>
+                <li><strong>[R] キー:</strong> 回転モードに切り替え</li>
+                <li><strong>[S] キー:</strong> 拡大・縮小モードに切り替え</li>
+                <li><strong>[F] キー:</strong> 展開図のプレビュー / 調整モードに戻る</li>
+                <li><strong>[H] キー:</strong> 投影ヘルパー（水色の板と視錐台）の表示/非表示</li>
+            </ul>
+            <button id="close-help">閉じる</button>
+        </div>
+    </div>
+    
+    <!--　メインのJavaScriptファイルをモジュールとして読み込み -->
+    <script type="module" src="./js/main.js"></script>
+
+</body>
+</html>
